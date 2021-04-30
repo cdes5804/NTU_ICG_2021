@@ -120,9 +120,9 @@ const degToRad = (deg) => {
     return deg * Math.PI / 180;
 }
 
-const drawScene = (gl, programInfo, buffers) => {
-    gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+const drawObject = (gl, programInfo, objectInfo) => {
+    const { translate, rotation, buffers } = objectInfo;
+    const { degree, axis } = rotation;
 
     if (buffers.positionBuffer === null ||
         buffers.normalBuffer === null ||
@@ -148,12 +148,12 @@ const drawScene = (gl, programInfo, buffers) => {
 
     mat4.translate(modelViewMatrix,
                    modelViewMatrix, 
-                   [0, 0, -50]);
+                   translate);
 
     mat4.rotate(modelViewMatrix,
                 modelViewMatrix,
-                programInfo.rotation,
-                [0, 1, 0]);
+                degree,
+                axis);
     
     mat4.invert(normalMatrix, modelViewMatrix);
     mat4.transpose(normalMatrix, normalMatrix);
@@ -233,7 +233,7 @@ const drawScene = (gl, programInfo, buffers) => {
     }
 }
 
-const animate = (gl, programInfo, buffers) => {
+const animate = (gl, programInfo, objectsInfo) => {
     let then = 0;
 
     const render = (now) => {
@@ -241,9 +241,14 @@ const animate = (gl, programInfo, buffers) => {
         const deltaTime = now - then;
         then = now;
 
-        drawScene(gl, programInfo, buffers);
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        programInfo.rotation += deltaTime;
+        for (const objectInfo of objectsInfo) {
+            drawObject(gl, programInfo, objectInfo);
+            objectInfo.rotation.degree += deltaTime;
+        }
+
         requestAnimationFrame(render);
     }
 
@@ -251,13 +256,14 @@ const animate = (gl, programInfo, buffers) => {
 }
 
 const main = async () => {
+    const objectsToDraw = ['Csie', 'Kangaroo'];
+
     const canvas = document.querySelector('#glcanvas');
     const gl = initWebGL(canvas);
     const shaderProgram = initShader(gl);
 
     const programInfo = {
         program: shaderProgram,
-        rotation: 0,
         attribLocation: {
             position: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
             normal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
@@ -270,13 +276,26 @@ const main = async () => {
         },
     };
 
-    const teapot = await getObject('Teapot');
-    const buffers = initBuffer(gl, teapot);
+    const objectInfo = [];
+
+    for (const object of objectsToDraw) {
+        const data = await getObject(object);
+        const buffers = initBuffer(gl, data);
+        const translate = [0, 0, -10];
+        const rotation = {
+            degree: 0,
+            axis: [0, 1, 0],
+        };
+
+        objectInfo.push({
+            buffers,
+            translate,
+            rotation,
+        });
+    }
 
     gl.clearColor(0.0, 0.2, 0.2, 1.0);
     gl.enable(gl.DEPTH_TEST);
 
-    animate(gl, programInfo, buffers);
+    animate(gl, programInfo, objectInfo);
 }
-
-main();
