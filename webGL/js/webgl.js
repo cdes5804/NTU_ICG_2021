@@ -38,6 +38,31 @@ const fsSource = `
     }
 `;
 
+mat4.shear = (out, a, lambda, axis) => {
+    const shearMatrix = [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1,
+    ];
+
+    if (axis[0]) {
+        shearMatrix[4] = lambda[0];
+        shearMatrix[8] = lambda[1];
+    } else if (axis[1]) {
+        shearMatrix[1] = lambda[0];
+        shearMatrix[9] = lambda[1];
+    } else if (axis[2]) {
+        shearMatrix[2] = lambda[0];
+        shearMatrix[6] = lambda[1];
+    }
+
+    const shearMat4 = mat4.create();
+    mat4.set(shearMat4, ...shearMatrix);
+    mat4.transpose(shearMat4, shearMat4);
+    mat4.multiply(out, a, shearMat4);
+}
+
 const initWebGL = (canvas) => {
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     gl.viewportWidth = canvas.width;
@@ -121,8 +146,9 @@ const degToRad = (deg) => {
 }
 
 const drawObject = (gl, programInfo, objectInfo) => {
-    const { translate, rotation, buffers } = objectInfo;
-    const { degree, axis } = rotation;
+    const { translate, rotation, scale, shear, buffers } = objectInfo;
+    const { degree, rotationAxis } = rotation;
+    const { lambda, shearAxis } = shear;
 
     if (buffers.positionBuffer === null ||
         buffers.normalBuffer === null ||
@@ -153,7 +179,16 @@ const drawObject = (gl, programInfo, objectInfo) => {
     mat4.rotate(modelViewMatrix,
                 modelViewMatrix,
                 degree,
-                axis);
+                rotationAxis);
+    
+    mat4.shear(modelViewMatrix,
+               modelViewMatrix,
+               lambda,
+               shearAxis)
+
+    mat4.scale(modelViewMatrix,
+               modelViewMatrix,
+               scale);
     
     mat4.invert(normalMatrix, modelViewMatrix);
     mat4.transpose(normalMatrix, normalMatrix);
@@ -284,13 +319,20 @@ const main = async () => {
         const translate = [0, 0, -10];
         const rotation = {
             degree: 0,
-            axis: [0, 1, 0],
+            rotationAxis: [0, 1, 0],
         };
+        const scale = [1, 1, 1];
+        const shear = {
+            lambda: [1, 1],
+            shearAxis: [0, 0, 0],
+        }
 
         objectInfo.push({
             buffers,
             translate,
             rotation,
+            scale,
+            shear,
         });
     }
 
