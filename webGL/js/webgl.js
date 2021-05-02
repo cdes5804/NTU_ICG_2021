@@ -1,12 +1,17 @@
-'use strict'
+'use strict';
+
+const objectsToDraw = ['Teapot'];
+const objectInfo = [];
+const backgroundColor = [0, 0, 0];
+let flatProgram = null;
+let gouraudProgram = null;
+let phongProgram = null;
 
 const flatVsSource = `
     attribute vec4 aVertexPosition;
-    attribute vec3 aVertexNormal;
     attribute vec3 aFrontColor;
 
     uniform mat4 uProjectionMatrix;
-    uniform mat4 uNormalMatrix;
     uniform mat4 uModelViewMatrix;
 
 	varying vec4 vertexViewSpace;
@@ -21,7 +26,7 @@ const flatVsSource = `
 
 const flatFsSource = `
     #extension GL_OES_standard_derivatives : enable
-    #define NUM_LIGHT 1
+    #define NUM_LIGHT 3
     precision mediump float;
 
     uniform float Ka;   // Ambient reflection coefficient
@@ -68,7 +73,7 @@ const flatFsSource = `
 `;
 
 const gouraudVsSource = `
-    #define NUM_LIGHT 1
+    #define NUM_LIGHT 3
     attribute vec4 aVertexPosition;
     attribute vec3 aVertexNormal;
     attribute vec3 aFrontColor;
@@ -155,7 +160,7 @@ const phongVsSource = `
 `;
 
 const phongFsSource = `
-    #define NUM_LIGHT 1
+    #define NUM_LIGHT 3
     precision mediump float;
 
     varying vec3 vNormal;
@@ -228,6 +233,7 @@ const initWebGL = (canvas) => {
     gl.viewportWidth = canvas.width;
     gl.viewportHeight = canvas.height;
     gl.getExtension('OES_standard_derivatives');
+    gl.enable(gl.DEPTH_TEST);
 
     return gl;
 }
@@ -302,6 +308,34 @@ const initBuffer = (gl, object) => {
     };
 }
 
+const genProgram = (gl, vsSource, fsSource) => {
+    const shaderProgram = initShader(gl, vsSource, fsSource);
+
+    const programInfo = {
+        program: shaderProgram,
+        attribLocation: {
+            position: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+            normal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
+            color: gl.getAttribLocation(shaderProgram, 'aFrontColor'),
+        },
+        uniformLocation: {
+            projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+            normalMatrix: gl.getUniformLocation(shaderProgram, 'uNormalMatrix'),
+            modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+            directedLight: {
+                source: gl.getUniformLocation(shaderProgram, 'uLightSource'),
+                color: gl.getUniformLocation(shaderProgram, 'uLightColor'),
+            },
+            Ka: gl.getUniformLocation(shaderProgram, 'Ka'),
+            Kd: gl.getUniformLocation(shaderProgram, 'Kd'),
+            Ks: gl.getUniformLocation(shaderProgram, 'Ks'),
+            shininess: gl.getUniformLocation(shaderProgram, 'shininess'),
+        },
+    };
+
+    return programInfo;
+}
+
 const degToRad = (deg) => {
     return deg * Math.PI / 180;
 }
@@ -364,7 +398,7 @@ const drawObject = (gl, programInfo, objectInfo) => {
     mat4.invert(normalMatrix, modelViewMatrix);
     mat4.transpose(normalMatrix, normalMatrix);
     
-    {
+    if (programInfo.attribLocation.position !== -1) {
         const numComponents = buffers.position.itemSize;
         const type = gl.FLOAT;
         const normalize = false;
@@ -382,7 +416,7 @@ const drawObject = (gl, programInfo, objectInfo) => {
             programInfo.attribLocation.position);
     }
 
-    {
+    if (programInfo.attribLocation.normal !== -1) {
         const numComponents = buffers.normal.itemSize;
         const type = gl.FLOAT;
         const normalize = false;
@@ -400,7 +434,7 @@ const drawObject = (gl, programInfo, objectInfo) => {
             programInfo.attribLocation.normal);
     }
     
-    {
+    if (programInfo.attribLocation.color !== -1) {
         const numComponents = buffers.color.itemSize;
         const type = gl.FLOAT;
         const normalize = false;
@@ -419,18 +453,26 @@ const drawObject = (gl, programInfo, objectInfo) => {
     }
 
     gl.useProgram(programInfo.program);
-    gl.uniformMatrix4fv(
-        programInfo.uniformLocation.projectionMatrix,
-        false,
-        projectionMatrix);
-    gl.uniformMatrix4fv(
-        programInfo.uniformLocation.normalMatrix,
-        false,
-        normalMatrix);
-    gl.uniformMatrix4fv(
-        programInfo.uniformLocation.modelViewMatrix,
-        false,
-        modelViewMatrix);
+    if (programInfo.uniformLocation.projectionMatrix !== -1) {
+        gl.uniformMatrix4fv(
+            programInfo.uniformLocation.projectionMatrix,
+            false,
+            projectionMatrix);
+    }
+    
+    if (programInfo.uniformLocation.normalMatrix !== -1) {
+        gl.uniformMatrix4fv(
+            programInfo.uniformLocation.normalMatrix,
+            false,
+            normalMatrix);
+    }
+
+    if (programInfo.uniformLocation.modelViewMatrix !== -1) {
+        gl.uniformMatrix4fv(
+            programInfo.uniformLocation.modelViewMatrix,
+            false,
+            modelViewMatrix);
+    }
     
     const { source, color } = directedLight;
     
@@ -460,7 +502,7 @@ const drawObject = (gl, programInfo, objectInfo) => {
     }
 }
 
-const animate = (gl, programInfo, objectsInfo) => {
+const animate = (gl, objectsInfo) => {
     let then = 0;
 
     const render = (now) => {
@@ -469,9 +511,11 @@ const animate = (gl, programInfo, objectsInfo) => {
         then = now;
 
         gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clearColor(...backgroundColor, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         for (const objectInfo of objectsInfo) {
+            const { programInfo } = objectInfo;
             drawObject(gl, programInfo, objectInfo);
             objectInfo.rotation.degree += deltaTime;
         }
@@ -482,38 +526,9 @@ const animate = (gl, programInfo, objectsInfo) => {
     requestAnimationFrame(render);
 }
 
-const main = async () => {
-    const objectsToDraw = ['Teapot'];
-
-    const canvas = document.querySelector('#glcanvas');
-    const gl = initWebGL(canvas);
-    const shaderProgram = initShader(gl, phongVsSource, phongFsSource);
-
-    const programInfo = {
-        program: shaderProgram,
-        attribLocation: {
-            position: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
-            normal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
-            color: gl.getAttribLocation(shaderProgram, 'aFrontColor'),
-        },
-        uniformLocation: {
-            projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
-            normalMatrix: gl.getUniformLocation(shaderProgram, 'uNormalMatrix'),
-            modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
-            directedLight: {
-                source: gl.getUniformLocation(shaderProgram, 'uLightSource'),
-                color: gl.getUniformLocation(shaderProgram, 'uLightColor'),
-            },
-            Ka: gl.getUniformLocation(shaderProgram, 'Ka'),
-            Kd: gl.getUniformLocation(shaderProgram, 'Kd'),
-            Ks: gl.getUniformLocation(shaderProgram, 'Ks'),
-            shininess: gl.getUniformLocation(shaderProgram, 'shininess'),
-        },
-    };
-
-    const objectInfo = [];
-
+const loadObjectInfo = async (gl) => {
     for (const object of objectsToDraw) {
+        const programInfo = flatProgram;
         const data = await getObject(object);
         const buffers = initBuffer(gl, data);
         const translate = [0, 0, -50];
@@ -527,8 +542,8 @@ const main = async () => {
             shearAxis: [0, 0, 0],
         };
         const directedLight = {
-            source: [0, 100, 0, 0, 0, 0, 0, 0, 0],
-            color: [0.1, 0.1, 0.1, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6],
+            source: [0, 100, 0, 100, 0, 0, 0, 0, 100],
+            color: [0.3, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.3],
         };
         let Ka = 1.0;
         let Kd = 1.0;
@@ -536,6 +551,7 @@ const main = async () => {
         let shininess = 80;
 
         objectInfo.push({
+            programInfo,
             buffers,
             translate,
             rotation,
@@ -548,9 +564,17 @@ const main = async () => {
             shininess,
         });
     }
+}
 
-    gl.clearColor(0.0, 0.2, 0.2, 1.0);
-    gl.enable(gl.DEPTH_TEST);
+const main = () => {
+    const canvas = document.querySelector('#glcanvas');
+    const gl = initWebGL(canvas);
 
-    animate(gl, programInfo, objectInfo);
+    flatProgram = genProgram(gl, flatVsSource, flatFsSource);
+    gouraudProgram = genProgram(gl, gouraudVsSource, gouraudFsSource);
+    phongProgram = genProgram(gl, phongVsSource, phongFsSource);
+
+    loadObjectInfo(gl).then(() => {
+        animate(gl, objectInfo);
+    });
 }
