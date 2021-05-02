@@ -40,28 +40,30 @@ const flatFsSource = `
         vec3 V = dFdy(vertexViewSpace.xyz);
         vec3 N = normalize(cross(U, V));
 
-        vec4 color;
         vec3 vertexPosition = vec3(vertexViewSpace) / vertexViewSpace.w;
+
+        vec3 ambient = Ka * vColor;
+        vec3 diffuse;
+        vec3 specular;
         
         for (int i = 0; i < NUM_LIGHT; i++) {
             vec3 L = normalize(uLightSource[i] - vertexPosition);
             float lambertian = max(dot(N, L), 0.0);
-            float specular = 0.0;
+            float specularCoef = 0.0;
 
             if (lambertian > 0.0) {
                 vec3 R = reflect(-L, N);                  // Reflected light vector
                 vec3 V = normalize(-vertexPosition);      // Vector to viewer
                 // Compute the specular term
                 float specAngle = max(dot(R, V), 0.0);
-                specular = pow(specAngle, shininess);
+                specularCoef = pow(specAngle, shininess);
             }
 
-            color += vec4(Ka * vColor +
-                          Kd * lambertian * uLightColor[i] * vColor +
-                          Ks * specular * uLightColor[i] * vColor, 1.0);
+            diffuse += Kd * lambertian * uLightColor[i] * vColor;
+            specular += Ks * specularCoef * uLightColor[i];
         }
 
-        gl_FragColor = color;
+        gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
     }
 `;
 
@@ -95,23 +97,28 @@ const gouraudVsSource = `
         vec3 normal = vec3(uNormalMatrix * vec4(aVertexNormal, 0.0));
         vec3 N = normalize(normal);
 
+        vec3 ambient = Ka * aFrontColor;
+        vec3 diffuse;
+        vec3 specular;
+
         for (int i = 0; i < NUM_LIGHT; i++) {
             vec3 L = normalize(uLightSource[i] - vertexPosition);
             float lambertian = max(dot(N, L), 0.0);
-            float specular = 0.0;
+            float specularCoef = 0.0;
             
             if (lambertian > 0.0) {
                 vec3 R = reflect(-L, N);                  // Reflected light vector
                 vec3 V = normalize(-vertexPosition); // Vector to viewer
                 // Compute the specular term
                 float specAngle = max(dot(R, V), 0.0);
-                specular = pow(specAngle, shininess);
+                specularCoef = pow(specAngle, shininess);
             }
 
-            vColor += vec4(Ka * aFrontColor +
-                           Kd * lambertian * uLightColor[i] * aFrontColor +
-                           Ks * specular * uLightColor[i] * aFrontColor, 1.0);
+            diffuse += Kd * lambertian * uLightColor[i] * aFrontColor;
+            specular += Ks * specularCoef * uLightColor[i];
         }
+
+        vColor = vec4(ambient + diffuse + specular, 1.0);
     }
 `;
 
@@ -165,27 +172,29 @@ const phongFsSource = `
 
     void main(void) {
         vec3 N = normalize(vNormal);
-        vec4 color;
+
+        vec3 ambient = Ka * vColor;
+        vec3 diffuse;
+        vec3 specular;
 
         for (int i = 0; i < NUM_LIGHT; i++) {
             vec3 L = normalize(uLightSource[i] - vVertexPosition);
             float lambertian = max(dot(N, L), 0.0);
-            float specular = 0.0;
+            float specularCoef = 0.0;
 
             if(lambertian > 0.0) {
                 vec3 R = reflect(-L, N);      // Reflected light vector
                 vec3 V = normalize(-vVertexPosition); // Vector to viewer
                 // Compute the specular term
                 float specAngle = max(dot(R, V), 0.0);
-                specular = pow(specAngle, shininess);
+                specularCoef = pow(specAngle, shininess);
             }
 
-            color += vec4(Ka * vColor +
-                          Kd * lambertian * uLightColor[i] * vColor +
-                          Ks * specular * uLightColor[i] * vColor, 1.0);
+            diffuse += Kd * lambertian * uLightColor[i] * vColor;
+            specular += Ks * specularCoef * uLightColor[i];
         }
 
-        gl_FragColor = color;
+        gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
     }
 `;
 
