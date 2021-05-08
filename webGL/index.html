@@ -5,6 +5,8 @@
         <meta http-equiv="content-type" content="text/html; charset=utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="stylesheet" type="text/css" href="style.css" />
+        <link rel="preconnect" href="https://fonts.gstatic.com">
+        <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js" integrity="sha512-zhHQR0/H5SEBL3Wn6yYSaTTZej12z0hVZKOv3TwCUXT1z5qeqGcXJLLrbERYRScEDDpYIJhPC1fk31gqR783iQ==" crossorigin="anonymous"></script>
         <script src="./js/webgl.js" defer></script>
         <script src="./js/app.js" defer></script>
@@ -14,9 +16,160 @@
     <div class="container">
         <canvas id="glcanvas"></canvas>
         <div class="panel">
-            <div class="item"></div>
-            <div class="item"></div>
-            <div class="item"></div>
+            <div class="env">
+                <div class="item">
+                    <span>Background Color</span>
+                    <input type="color" id="background-color" value="#000000">
+                </div>
+                <div class="item">
+                    <span>Light Source 1</span>
+                    <div class="block">
+                        <div class="title">
+                            <label for="x1">X</label>
+                            <label for="y1">Y</label>
+                            <label for="z1">Z</label>
+                            <label for="c1">Color</label>
+                        </div>
+                        <div class="option">
+                            <input id="x1" type="number" value="100">
+                            <input id="y1" type="number" value="0">
+                            <input id="z1" type="number" value="0">
+                            <input id="c1" type="color" value="#4D0000">
+                        </div>
+                    </div>
+                </div>
+                <div class="item">
+                    <span>Light Source 2</span>
+                    <div class="block">
+                        <div class="title">
+                            <label for="x2">X</label>
+                            <label for="y2">Y</label>
+                            <label for="z2">Z</label>
+                            <label for="c2">Color</label>
+                        </div>
+                        <div class="option">
+                            <input id="x2" type="number" value="0">
+                            <input id="y2" type="number" value="100">
+                            <input id="z2" type="number" value="0">
+                            <input id="c2" type="color" value="#004D00">
+                        </div>
+                    </div>
+                </div>
+                <div class="item">
+                    <span>Light Source 3</span>
+                    <div class="block">
+                        <div class="title">
+                            <label for="x3">X</label>
+                            <label for="y3">Y</label>
+                            <label for="z3">Z</label>
+                            <label for="c3">Color</label>
+                        </div>
+                        <div class="option">
+                            <input id="x3" type="number" value="0">
+                            <input id="y3" type="number" value="0">
+                            <input id="z3" type="number" value="100">
+                            <input id="c3" type="color" value="#00004D">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="object">
+                <div class="item">
+                    <span>Object</span>
+                    <select name="obj" id="obj">
+                        <option value="Kangaroo" id="obj1">Kangaroo</option>
+                        <option value="Teapot" selected="selected" id="obj2">Teapot</option>
+                        <option value="Csie" id="obj3">Csie</option>
+                    </select>
+                </div>
+                <div class="item">
+                    <span>Shading</span>
+                    <select name="shading" id="shading">
+                        <option value="flat" selected="selected">Flat Shading</option>
+                        <option value="gouraud">Gouraud Shading</option>
+                        <option value="phong">Phong Shading</option>
+                    </select>
+                </div>
+                <div class="item">
+                    <span>Translation</span>
+                    <div class="block">
+                        <div class="title">
+                            <label for="tx">X</label>
+                            <label for="ty">Y</label>
+                            <label for="tz">Z</label>
+                        </div>
+                        <div class="option">
+                            <input id="tx" type="range" min="-40" max="40" value="0">
+                            <input id="ty" type="range" min="-20" max="15" value="0">
+                            <input id="tz" type="range" min="-70" max="-10" value="-50">
+                        </div>
+                    </div>
+                </div>
+                <div class="item">
+                    <span>Rotation</span>
+                    <div class="block">
+                        <div class="title">
+                            <label for="rx">X</label>
+                            <label for="ry">Y</label>
+                            <label for="rz">Z</label>
+                        </div>
+                        <div class="option">
+                            <input id="rx" type="range" min="-100" max="100" value="0">
+                            <input id="ry" type="range" min="-100" max="100" value="100">
+                            <input id="rz" type="range" min="-100" max="100" value="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="item">
+                    <span>Scale</span>
+                    <div class="block">
+                        <div class="title">
+                            <label for="sx">X</label>
+                            <label for="sy">Y</label>
+                            <label for="sz">Z</label>
+                        </div>
+                        <div class="option">
+                            <input id="sx" type="range" min="0" max="100" value="50">
+                            <input id="sy" type="range" min="0" max="100" value="50">
+                            <input id="sz" type="range" min="0" max="100" value="50">
+                        </div>
+                    </div>
+                </div>
+                <div class="item">
+                    <span>Shear</span>
+                    <div class="block">
+                        <div class="title">
+                            <label for="shx">Axis</label>
+                            <label for="shc">Lambda</label>
+                        </div>
+                        <div class="option">
+                            <select id="shx">
+                                <option selected="selected" name="x" value="x">X</option>
+                                <option name="y" value="y">Y</option>
+                                <option name="z" value="z">Z</option>
+                            </select>
+                            <input id="shc" type="number" value="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="item">
+                    <span>Lighting</span>
+                    <div class="block">
+                        <div class="title">
+                            <label for="ambient">Ambient</label>
+                            <label for="diffuse">Diffuse</label>
+                            <label for="specular">Specular</label>
+                            <label for="shininess">Shininess</label>
+                        </div>
+                        <div class="option">
+                            <input id="ambient" type="range" min="0" max="20" value="16">
+                            <input id="diffuse" type="range" min="0" max="20" value="16">
+                            <input id="specular" type="range" min="0" max="20" value="16">
+                            <input id="shininess" type="range" min="0" max="100" value="80">
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     

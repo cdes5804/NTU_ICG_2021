@@ -2,6 +2,7 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
 }
 
 body {
@@ -28,5 +29,102 @@ canvas {
     height: 20vh;
     display: flex;
     flex-direction: row;
+}
+
+.env {
+    display: flex;
+    flex-direction: row;
+    width: 37%;
+    align-items: center;
+    justify-content: center;
     background-color: #ddd;
+}
+
+.object {
+    display: flex;
+    flex-direction: row;
+    width: 63%;
+    align-items: center;
+    justify-content: center;
+    background-color: #bbb;
+}
+
+.env input {
+    margin: auto;
+}
+
+.block {
+    margin: auto;
+    display: flex;
+    flex-direction: row;
+    max-width: 100%;
+}
+
+.title {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.option {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.option input {
+    width: 50%;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.env .item {
+    flex: 1;
+    height: 80%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    margin: auto;
+    border-left: 2px solid #bbb;
+}
+
+.object .item {
+    flex: 1;
+    height: 80%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    margin: auto;
+    border-right: 2px solid #ddd;
+}
+
+.object select {
+    margin: auto;
+}
+
+.obj-action {
+    height: 33%;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+input[type=range] {
+    width: 100%;
+    margin: auto;
+}
+
+.option select {
+    width: 50%;
 }

@@ -1,8 +1,12 @@
 'use strict';
 
-const objectsToDraw = ['Teapot'];
+const objectsToDraw = ['Kangaroo', 'Teapot', 'Csie'];
 const objectInfo = [];
 const backgroundColor = [0, 0, 0];
+const directedLight = {
+    source: [0, 100, 0, 100, 0, 0, 0, 0, 100],
+    color: [0.3, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.3],
+};
 let flatProgram = null;
 let gouraudProgram = null;
 let phongProgram = null;
@@ -212,14 +216,14 @@ mat4.shear = (out, a, lambda, axis) => {
     ];
 
     if (axis[0]) {
-        shearMatrix[4] = lambda[0];
-        shearMatrix[8] = lambda[1];
+        shearMatrix[4] = lambda;
+        shearMatrix[8] = lambda;
     } else if (axis[1]) {
-        shearMatrix[1] = lambda[0];
-        shearMatrix[9] = lambda[1];
+        shearMatrix[1] = lambda;
+        shearMatrix[9] = lambda;
     } else if (axis[2]) {
-        shearMatrix[2] = lambda[0];
-        shearMatrix[6] = lambda[1];
+        shearMatrix[2] = lambda;
+        shearMatrix[6] = lambda;
     }
 
     const shearMat4 = mat4.create();
@@ -362,11 +366,11 @@ const resizeCanvas = (gl) => {
 const drawObject = (gl, programInfo, objectInfo) => {
     resizeCanvas(gl);
     const {
+        object,
         translate,
         rotation,
         scale,
         shear,
-        directedLight,
         Ka,
         Kd,
         Ks,
@@ -382,10 +386,17 @@ const drawObject = (gl, programInfo, objectInfo) => {
         return;
     }
 
+    /* adjust for teapot as it is strangly large */
+    if (object === 'Teapot') {
+        translate[0] *= 10;
+        translate[1] *= 15;
+        translate[2] *= 18;
+    }
+
     const fieldOfView = degToRad(45);
     const aspect = gl.canvas.width / gl.canvas.height;
-    const zNear = 0.1;
-    const zFar = 100.0;
+    const zNear = 1;
+    const zFar = 2000;
 
     const projectionMatrix = mat4.create();
     const normalMatrix = mat4.create();
@@ -520,6 +531,16 @@ const drawObject = (gl, programInfo, objectInfo) => {
         const vertexCount = buffers.position.numItems;
         gl.drawArrays(gl.TRIANGLES, offset, vertexCount);
     }
+
+    /*
+        Recover teapot to its original state,
+        or it will grow exponentially.
+    */
+    if (object === 'Teapot') {
+        translate[0] /= 10;
+        translate[1] /= 15;
+        translate[2] /= 18;
+    }
 }
 
 const animate = (gl, objectsInfo) => {
@@ -547,34 +568,35 @@ const animate = (gl, objectsInfo) => {
 
 const loadObjectInfo = async (gl) => {
     const objectCount = objectsToDraw.length;
-    const maxX = 30;
-    const maxY = 10;
+    const maxX = 4;
 
     for (let i = 0; i < objectCount; ++i) {
         const object = objectsToDraw[i];
         const programInfo = flatProgram;
         const data = await getObject(object);
         const buffers = initBuffer(gl, data);
-        const translate = [30, 0, -50];
+
+        const posX = (-maxX + (2 * maxX * (i + 1) / (objectCount + 1)));
+        const posY = 0;
+        const posZ = -5;
+
+        const translate = [posX, posY, posZ];
         const rotation = {
             degree: 0,
             rotationAxis: [0, 1, 0],
         };
         const scale = [1, 1, 1];
         const shear = {
-            lambda: [0.1, 0.1],
-            shearAxis: [0, 0, 0],
+            lambda: 0,
+            shearAxis: [1, 0, 0],
         };
-        const directedLight = {
-            source: [0, 100, 0, 100, 0, 0, 0, 0, 100],
-            color: [0.3, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0, 0.3],
-        };
-        let Ka = 1.0;
-        let Kd = 1.0;
-        let Ks = 1.0;
+        let Ka = 0.8;
+        let Kd = 0.8;
+        let Ks = 0.8;
         let shininess = 80;
 
         objectInfo.push({
+            object,
             programInfo,
             buffers,
             translate,
