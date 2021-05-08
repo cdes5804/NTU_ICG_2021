@@ -340,7 +340,27 @@ const degToRad = (deg) => {
     return deg * Math.PI / 180;
 }
 
+const resizeCanvas = (gl) => {
+    const canvas = gl.canvas;
+    
+    const displayWidth  = canvas.clientWidth;
+    const displayHeight = canvas.clientHeight;
+    
+    // Check if the canvas is not the same size.
+    const needResize = canvas.width  !== displayWidth ||
+                       canvas.height !== displayHeight;
+    
+    if (needResize) {
+        // Make the canvas the same size
+        canvas.width  = displayWidth;
+        canvas.height = displayHeight;
+    }
+
+    gl.viewport(0, 0, canvas.width, canvas.height);
+}
+
 const drawObject = (gl, programInfo, objectInfo) => {
+    resizeCanvas(gl);
     const {
         translate,
         rotation,
@@ -362,8 +382,8 @@ const drawObject = (gl, programInfo, objectInfo) => {
         return;
     }
 
-    const fieldOfView = 45 * Math.PI / 180;
-    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    const fieldOfView = degToRad(45);
+    const aspect = gl.canvas.width / gl.canvas.height;
     const zNear = 0.1;
     const zFar = 100.0;
 
@@ -510,7 +530,6 @@ const animate = (gl, objectsInfo) => {
         const deltaTime = now - then;
         then = now;
 
-        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
         gl.clearColor(...backgroundColor, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -527,11 +546,16 @@ const animate = (gl, objectsInfo) => {
 }
 
 const loadObjectInfo = async (gl) => {
-    for (const object of objectsToDraw) {
+    const objectCount = objectsToDraw.length;
+    const maxX = 30;
+    const maxY = 10;
+
+    for (let i = 0; i < objectCount; ++i) {
+        const object = objectsToDraw[i];
         const programInfo = flatProgram;
         const data = await getObject(object);
         const buffers = initBuffer(gl, data);
-        const translate = [0, 0, -50];
+        const translate = [30, 0, -50];
         const rotation = {
             degree: 0,
             rotationAxis: [0, 1, 0],
