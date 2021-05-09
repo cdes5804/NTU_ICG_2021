@@ -11,20 +11,28 @@ let flatProgram = null;
 let gouraudProgram = null;
 let phongProgram = null;
 
+let playing = false;
+let timeupdate = false;
+let playVideo = true;
+const videoURL = 'Firefox.mp4';
+
 const flatVsSource = `
     attribute vec4 aVertexPosition;
     attribute vec3 aFrontColor;
+    attribute vec2 aTextureCoord;
 
     uniform mat4 uProjectionMatrix;
     uniform mat4 uModelViewMatrix;
 
 	varying vec4 vertexViewSpace;
     varying vec3 vColor;
+    varying highp vec2 vTextureCoord;
 
     void main(void) {
         vertexViewSpace = uModelViewMatrix * aVertexPosition;
         gl_Position = uProjectionMatrix * vertexViewSpace;
         vColor = aFrontColor;
+        vTextureCoord = aTextureCoord;
     }
 `;
 
@@ -40,9 +48,11 @@ const flatFsSource = `
 
     varying vec4 vertexViewSpace;
     varying vec3 vColor;
+    varying highp vec2 vTextureCoord;
     
     uniform vec3 uLightSource[NUM_LIGHT];
     uniform vec3 uLightColor[NUM_LIGHT];
+    uniform sampler2D uSampler;
     
     void main(void) {
         vec3 U = dFdx(vertexViewSpace.xyz);                     
@@ -72,7 +82,9 @@ const flatFsSource = `
             specular += Ks * specularCoef * uLightColor[i];
         }
 
-        gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
+        highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+        vec3 lighting = ambient + diffuse + specular;
+        gl_FragColor = vec4(lighting * texelColor.rgb, texelColor.a);
     }
 `;
 
@@ -207,6 +219,38 @@ const phongFsSource = `
     }
 `;
 
+const setupVideo = (url) => {
+    const video = document.createElement('video');
+
+    video.autoplay = true;
+    video.muted = true;
+    video.loop = true;
+
+    video.src = url;
+    video.play();
+
+    video.addEventListener('playing', () => {
+        playing = true;
+    });
+
+    video.addEventListener('timeupdate', () => {
+        timeupdate = true;
+    });
+
+    return video;
+}
+
+const updateTexture = (gl, texture, video) => {
+    const level = 0;
+    const internalFormat = gl.RGBA;
+    const srcFormat = gl.RGBA;
+    const srcType = gl.UNSIGNED_BYTE;
+
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
+                  srcFormat, srcType, video);
+}
+
 mat4.shear = (out, a, lambda, axis) => {
     const shearMatrix = [
         1, 0, 0, 0,
@@ -305,10 +349,22 @@ const initBuffer = (gl, object) => {
     colorBuffer.itemSize = 3;
     colorBuffer.numItems = object.vertexFrontcolors.length / 3;
 
+    let textureBuffer = null;
+    if (object.vertexTextureCoords) {
+        textureBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER,
+                      new Float32Array(object.vertexTextureCoords),
+                      gl.STATIC_DRAW);
+        textureBuffer.itemSize = 2;
+        textureBuffer.numItems = object.vertexTextureCoords.length / 2;
+    }
+
     return {
         position: positionBuffer,
         normal: normalBuffer,
         color: colorBuffer,
+        texture: textureBuffer,
     };
 }
 
@@ -321,6 +377,7 @@ const genProgram = (gl, vsSource, fsSource) => {
             position: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
             normal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
             color: gl.getAttribLocation(shaderProgram, 'aFrontColor'),
+            texture: gl.getAttribLocation(shaderProgram, 'aTextureCoord'),
         },
         uniformLocation: {
             projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
@@ -334,6 +391,7 @@ const genProgram = (gl, vsSource, fsSource) => {
             Kd: gl.getUniformLocation(shaderProgram, 'Kd'),
             Ks: gl.getUniformLocation(shaderProgram, 'Ks'),
             shininess: gl.getUniformLocation(shaderProgram, 'shininess'),
+            uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
         },
     };
 
@@ -363,7 +421,7 @@ const resizeCanvas = (gl) => {
     gl.viewport(0, 0, canvas.width, canvas.height);
 }
 
-const drawObject = (gl, programInfo, objectInfo) => {
+const drawObject = (gl, programInfo, objectInfo, texture) => {
     resizeCanvas(gl);
     const {
         object,
@@ -483,6 +541,24 @@ const drawObject = (gl, programInfo, objectInfo) => {
             programInfo.attribLocation.color); 
     }
 
+    if (buffers.texture) {
+        const numComponents = buffers.texture.itemSize;
+        const type = gl.FLOAT;
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.texture);
+        gl.vertexAttribPointer(
+            programInfo.attribLocation.texture,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        gl.enableVertexAttribArray(
+            programInfo.attribLocation.texture);
+    }
+
     gl.useProgram(programInfo.program);
     if (programInfo.uniformLocation.projectionMatrix !== -1) {
         gl.uniformMatrix4fv(
@@ -525,6 +601,10 @@ const drawObject = (gl, programInfo, objectInfo) => {
     gl.uniform1f(
         programInfo.uniformLocation.shininess,
         shininess);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(programInfo.uniformLocation.uSampler, 0);
     
     {
         const offset = 0;
@@ -543,7 +623,31 @@ const drawObject = (gl, programInfo, objectInfo) => {
     }
 }
 
-const animate = (gl, objectsInfo) => {
+const initTexture = (gl) => {
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    const level = 0;
+    const internelFormat = gl.RGBA;
+    const width = 1;
+    const height = 1;
+    const border = 0;
+    const srcFormat = gl.RGBA;
+    const srcType = gl.UNSIGNED_BYTE;
+    const pixel = new Uint8Array([255, 255, 255, 255]);
+
+    gl.texImage2D(gl.TEXTURE_2D, level, internelFormat,
+                  width, height, border, srcFormat, srcType,
+                  pixel);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+    return texture;
+}
+
+const animate = (gl, objectsInfo, texture, video) => {
     let then = 0;
 
     const render = (now) => {
@@ -556,7 +660,14 @@ const animate = (gl, objectsInfo) => {
 
         for (const objectInfo of objectsInfo) {
             const { programInfo } = objectInfo;
-            drawObject(gl, programInfo, objectInfo);
+
+            if (playing && timeupdate && objectInfo.object === 'Teapot') {
+                updateTexture(gl, texture, video);
+            } else {
+                texture = initTexture(gl);
+            }
+
+            drawObject(gl, programInfo, objectInfo, texture);
             objectInfo.rotation.degree += deltaTime;
         }
 
@@ -620,7 +731,14 @@ const main = () => {
     gouraudProgram = genProgram(gl, gouraudVsSource, gouraudFsSource);
     phongProgram = genProgram(gl, phongVsSource, phongFsSource);
 
+    const texture = initTexture(gl);
+
+    let video = null;
+    if (playVideo) {
+        video = setupVideo(videoURL);
+    }
+
     loadObjectInfo(gl).then(() => {
-        animate(gl, objectInfo);
+        animate(gl, objectInfo, texture, video);
     });
 }
