@@ -11,10 +11,8 @@ let flatProgram = null;
 let gouraudProgram = null;
 let phongProgram = null;
 
-let playing = false;
-let timeupdate = false;
-let playVideo = true;
-const videoURL = 'Firefox.mp4';
+let imageLoaded = false;
+const imageURL = 'wood.jpeg';
 
 const flatVsSource = `
     attribute vec4 aVertexPosition;
@@ -93,12 +91,14 @@ const gouraudVsSource = `
     attribute vec4 aVertexPosition;
     attribute vec3 aVertexNormal;
     attribute vec3 aFrontColor;
+    attribute vec2 aTextureCoord;
 
     uniform mat4 uProjectionMatrix;
     uniform mat4 uNormalMatrix;
     uniform mat4 uModelViewMatrix;
 
     varying vec4 vColor;
+    varying highp vec2 vTextureCoord;
 
     precision mediump float;
 
@@ -140,15 +140,20 @@ const gouraudVsSource = `
         }
 
         vColor = vec4(ambient + diffuse + specular, 1.0);
+        vTextureCoord = aTextureCoord;
     }
 `;
 
 const gouraudFsSource = `
     precision highp float;
     varying vec4 vColor;
+    varying highp vec2 vTextureCoord;
+
+    uniform sampler2D uSampler;
 
     void main(void) {
-        gl_FragColor = vColor;
+        highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+        gl_FragColor = vec4(vColor.rgb * texelColor.rgb, texelColor.a);
     }
 `;
 
@@ -156,6 +161,7 @@ const phongVsSource = `
     attribute vec4 aVertexPosition;
     attribute vec3 aVertexNormal;
     attribute vec3 aFrontColor;
+    attribute vec2 aTextureCoord;
 
     uniform mat4 uProjectionMatrix;
     uniform mat4 uNormalMatrix;
@@ -164,6 +170,7 @@ const phongVsSource = `
     varying vec3 vNormal;
     varying vec3 vVertexPosition;
     varying vec3 vColor;
+    varying highp vec2 vTextureCoord;
 
     void main(void) {
         vec4 vertexViewSpace = uModelViewMatrix * aVertexPosition;
@@ -172,7 +179,8 @@ const phongVsSource = `
         vVertexPosition = vec3(vertexViewSpace) / vertexViewSpace.w;
         vNormal = vec3(uNormalMatrix * vec4(aVertexNormal, 0.0));
         vColor = aFrontColor;
-}
+        vTextureCoord = aTextureCoord;
+    }
 `;
 
 const phongFsSource = `
@@ -182,6 +190,7 @@ const phongFsSource = `
     varying vec3 vNormal;
     varying vec3 vVertexPosition;
     varying vec3 vColor;
+    varying highp vec2 vTextureCoord;
 
     uniform float Ka;   // Ambient reflection coefficient
     uniform float Kd;   // Diffuse reflection coefficient
@@ -190,6 +199,7 @@ const phongFsSource = `
 
     uniform vec3 uLightSource[NUM_LIGHT];
     uniform vec3 uLightColor[NUM_LIGHT];
+    uniform sampler2D uSampler;
 
     void main(void) {
         vec3 N = normalize(vNormal);
@@ -215,32 +225,25 @@ const phongFsSource = `
             specular += Ks * specularCoef * uLightColor[i];
         }
 
-        gl_FragColor = vec4(ambient + diffuse + specular, 1.0);
+        vec3 lighting = ambient + diffuse + specular;
+        highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+        gl_FragColor = vec4(lighting * texelColor.rgb, texelColor.a);
     }
 `;
 
-const setupVideo = (url) => {
-    const video = document.createElement('video');
+const setupImage = (url) => {
+    const image = document.createElement('img');
 
-    video.autoplay = true;
-    video.muted = true;
-    video.loop = true;
+    image.src = url;
 
-    video.src = url;
-    video.play();
-
-    video.addEventListener('playing', () => {
-        playing = true;
+    image.addEventListener('load', () => {
+        imageLoaded = true;
     });
 
-    video.addEventListener('timeupdate', () => {
-        timeupdate = true;
-    });
-
-    return video;
+    return image;
 }
 
-const updateTexture = (gl, texture, video) => {
+const updateTexture = (gl, texture, image) => {
     const level = 0;
     const internalFormat = gl.RGBA;
     const srcFormat = gl.RGBA;
@@ -248,7 +251,7 @@ const updateTexture = (gl, texture, video) => {
 
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
-                  srcFormat, srcType, video);
+                  srcFormat, srcType, image);
 }
 
 mat4.shear = (out, a, lambda, axis) => {
@@ -657,7 +660,7 @@ const initTexture = (gl) => {
     return texture;
 }
 
-const animate = (gl, objectsInfo, texture, video) => {
+const animate = (gl, objectsInfo, texture, image) => {
     let then = 0;
 
     const render = (now) => {
@@ -671,8 +674,8 @@ const animate = (gl, objectsInfo, texture, video) => {
         for (const objectInfo of objectsInfo) {
             const { programInfo } = objectInfo;
 
-            if (playing && timeupdate && objectInfo.object === 'Teapot') {
-                updateTexture(gl, texture, video);
+            if (imageLoaded && objectInfo.object === 'Teapot') {
+                updateTexture(gl, texture, image);
             } else {
                 texture = initTexture(gl);
             }
@@ -742,13 +745,9 @@ const main = () => {
     phongProgram = genProgram(gl, phongVsSource, phongFsSource);
 
     const texture = initTexture(gl);
-
-    let video = null;
-    if (playVideo) {
-        video = setupVideo(videoURL);
-    }
+    const image = setupImage(imageURL);
 
     loadObjectInfo(gl).then(() => {
-        animate(gl, objectInfo, texture, video);
+        animate(gl, objectInfo, texture, image);
     });
 }
