@@ -324,6 +324,15 @@ const getObject = async (object) => {
     return data;
 }
 
+const initTextureCoord = (numItems) => {
+    const textureCoord = [];
+    for (let i = 0; i < 2 * numItems; ++i) {
+        textureCoord.push(0.0);
+    }
+
+    return textureCoord;
+}
+
 const initBuffer = (gl, object) => {
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -349,16 +358,17 @@ const initBuffer = (gl, object) => {
     colorBuffer.itemSize = 3;
     colorBuffer.numItems = object.vertexFrontcolors.length / 3;
 
-    let textureBuffer = null;
-    if (object.vertexTextureCoords) {
-        textureBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER,
-                      new Float32Array(object.vertexTextureCoords),
-                      gl.STATIC_DRAW);
-        textureBuffer.itemSize = 2;
-        textureBuffer.numItems = object.vertexTextureCoords.length / 2;
+    if (!object.vertexTextureCoords) {
+        object.vertexTextureCoords = initTextureCoord(positionBuffer.numItems);
     }
+    
+    const textureBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER,
+                    new Float32Array(object.vertexTextureCoords),
+                    gl.STATIC_DRAW);
+    textureBuffer.itemSize = 2;
+    textureBuffer.numItems = object.vertexTextureCoords.length / 2;
 
     return {
         position: positionBuffer,
